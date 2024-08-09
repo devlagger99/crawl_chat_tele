@@ -106,7 +106,7 @@ const runCode = async () => {
         console.log(`Message ID: ${message.id}`);
         console.log(newMessage);
 
-        // await client.sendMessage(channelBot, { message: newMessage });
+        await client.sendMessage(channelBot, { message: newMessage });
 
         receivedMessageIds.add(message.id);
       }, 2000 * index);
