@@ -109,7 +109,7 @@ const runCode = async () => {
         await client.sendMessage(channelBot, { message: newMessage });
 
         receivedMessageIds.add(message.id);
-      }, 2000 * index);
+      }, 5000 * index);
     });
 
     fs.writeFileSync(
