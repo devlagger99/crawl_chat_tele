@@ -80,14 +80,16 @@ const runCode = async () => {
 
         newMessage = newMessage.map((x) => {
           if (x.includes("Short")) {
-            stopLoss = entryValue - entryValue * 1.001;
+            entryValue = entryValue - entryValue * 0.001;
+            stopLoss = entryValue + entryValue * 0.05;
 
             stopLoss = Math.round(stopLoss * 1000) / 1000;
 
             return x.replace("(Short, x20)", "\nSHORT");
           }
           if (x.includes("Long")) {
-            stopLoss = entryValue + entryValue * 1.001;
+            entryValue = entryValue + entryValue * 0.001;
+            stopLoss = entryValue - entryValue * 0.05;
 
             stopLoss = Math.round(stopLoss * 1000) / 1000;
 
