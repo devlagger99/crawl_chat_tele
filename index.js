@@ -1,4 +1,4 @@
-const { Api, TelegramClient } = require("telegram");
+const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 const fs = require("fs");
@@ -7,6 +7,42 @@ const input = require("input");
 
 const receivedMessageIds = new Set();
 let stringSession = "";
+
+const extractAndFormatMessage = async (message) => {
+  //
+  const pairMatch = message.match(/#(\w+)\/(\w+)/);
+  const positionLeverageMatch = message.match(/\((Long|Short), x(\d+)\)/);
+  const entryMatch = message.match(/Entry - ([\d.]+)/);
+  const takeProfitMatches = message.match(
+    /Take-Profit:\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+)/
+  );
+
+  if (pairMatch && positionLeverageMatch && entryMatch && takeProfitMatches) {
+    const pair = `${pairMatch[1]}${pairMatch[2]}`;
+    const position = positionLeverageMatch[1].toUpperCase();
+    const entry = Number(entryMatch[1]);
+    const takeProfits = takeProfitMatches.slice(1).join("\n");
+
+    let stopLoss = null;
+
+    if (position === "LONG") {
+      let entryValue = entry + entry * 0.003;
+      stopLoss = entryValue - entryValue * 0.05;
+
+      stopLoss = Math.round(stopLoss * 1000) / 1000;
+    } else {
+      let entryValue = entry - entry * 0.003;
+      stopLoss = entryValue + entryValue * 0.05;
+
+      stopLoss = Math.round(stopLoss * 1000) / 1000;
+    }
+
+    res_mess = `${pair}\n${position}\n20\nX10\nTP:\n${takeProfits}\nSL:\n${stopLoss}`;
+    return res_mess;
+  } else {
+    console.error("Input format is not recognized.");
+  }
+};
 
 const runCode = async () => {
   try {
@@ -47,80 +83,17 @@ const runCode = async () => {
   fs.writeFileSync("session.txt", client.session.save()); // Save to a file
   console.log("Session saved to session.txt"); // Save this string to avoid logging in again
 
-  const channel = await client.getEntity(config.chatId);
-  const channelBot = await client.getEntity(config.chatIdBot);
+  const channelBot = await client.getEntity(config.chatIdBot); // get client for sending message for room chat
 
-  const fetchNewMessages = async () => {
-    let messages = await client.getMessages(channel, {
-      limit: 100, // Set the limit as needed, you can paginate if necessary
-    });
-    messages = messages.filter((x) => !x.replyTo);
+  client.addEventHandler(async (event) => {
+    const message = event.message;
 
-    let newMessages = messages.filter(
-      (message) =>
-        !receivedMessageIds.has(message.id) &&
-        message?.message?.includes("Entry")
-    );
+    if (message.message.includes("Entry")) {
+      let exec_mess = await extractAndFormatMessage(message.message);
 
-    newMessages = newMessages.sort((a, b) => a.id - b.id);
-
-    newMessages.forEach((message, index) => {
-      setTimeout(async () => {
-        let res_mess = "";
-
-        const pairMatch = message.message.match(/#(\w+)\/(\w+)/);
-        const positionLeverageMatch = message.message.match(
-          /\((Long|Short), x(\d+)\)/
-        );
-        const entryMatch = message.message.match(/Entry - ([\d.]+)/);
-
-        const takeProfitMatches = message.message.match(
-          /Take-Profit:\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+)/
-        );
-
-        if (
-          pairMatch &&
-          positionLeverageMatch &&
-          entryMatch &&
-          takeProfitMatches
-        ) {
-          const pair = `${pairMatch[1]}${pairMatch[2]}`;
-          const position = positionLeverageMatch[1].toUpperCase();
-          const entry = Number(entryMatch[1]);
-          const takeProfits = takeProfitMatches.slice(1).join("\n");
-
-          let stopLoss = null;
-
-          if (position === "LONG") {
-            let entryValue = entry + entry * 0.003;
-            stopLoss = entryValue - entryValue * 0.05;
-
-            stopLoss = Math.round(stopLoss * 1000) / 1000;
-          } else {
-            let entryValue = entry - entry * 0.003;
-            stopLoss = entryValue + entryValue * 0.05;
-
-            stopLoss = Math.round(stopLoss * 1000) / 1000;
-          }
-
-          res_mess = `${pair}\n${position}\n20\nX10\nTP:\n${takeProfits}\nSL:\n${stopLoss}`;
-          console.log(res_mess);
-          console.log(message.id);
-          await client.sendMessage(channelBot, { message: res_mess });
-          receivedMessageIds.add(message.id);
-          fs.writeFileSync(
-            "received_message_ids.txt",
-            Array.from(receivedMessageIds).join("\n")
-          );
-        } else {
-          console.error("Input format is not recognized.");
-        }
-      }, 1000 * index);
-    });
-  };
-
-  fetchNewMessages();
-  setInterval(fetchNewMessages, 1000 * 3);
+      await client.sendMessage(channelBot, { message: exec_mess });
+    }
+  }, new NewMessage({ chats: [config.chatId] }));
 };
 
 runCode();
