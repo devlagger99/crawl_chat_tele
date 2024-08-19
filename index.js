@@ -66,49 +66,43 @@ const runCode = async () => {
 
     newMessages.forEach((message, index) => {
       setTimeout(async () => {
-        let stopLoss;
-        let newMessage = message.message.split("\n");
-        let entryValue = "";
-        newMessage = newMessage.filter((x) => {
-          if (x.startsWith("Entry")) {
-            entryValue = x.split("-")[1].trim();
+        let res_mess = "";
+        const pairMatch = message.match(/#(\w+)\/(\w+)/);
+        const positionLeverageMatch = message.match(/\((Long|Short), x(\d+)\)/);
+        const entryMatch = message.match(/Entry - ([\d.]+)/);
+
+        const takeProfitMatches = message.match(
+          /Take-Profit:\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+)/
+        );
+
+        if (
+          pairMatch &&
+          positionLeverageMatch &&
+          entryMatch &&
+          takeProfitMatches
+        ) {
+          const pair = `${pairMatch[1]}${pairMatch[2]}`;
+          const position = positionLeverageMatch[1].toUpperCase();
+          const entry = Number(entryMatch[1]);
+          const takeProfits = takeProfitMatches.slice(1).join("\n");
+
+          let stopLoss = null;
+
+          if (position === "LONG") {
+            let entryValue = entry + entry * 0.005;
+            stopLoss = Math.round(entryValue - entryValue * 0.05 * 1000) / 1000;
+          } else {
+            let entryValue = entry - entry * 0.005;
+            stopLoss = Math.round(entryValue - entryValue * 0.05 * 1000) / 1000;
           }
-          return !x.includes("ADMIN : @zhaozhao68") && x.length > 0;
-        });
 
-        entryValue = Number(entryValue);
+          res_mess = `${pair}\n${position}\n20\nX10\nTP:\n${takeProfits}\nSL:${stopLoss}`;
+          console.log(res_mess);
+        } else {
+          console.error("Input format is not recognized.");
+        }
 
-        newMessage = newMessage.map((x) => {
-          if (x.includes("Short")) {
-            entryValue = entryValue - entryValue * 0.001;
-            stopLoss = entryValue + entryValue * 0.05;
-
-            stopLoss = Math.round(stopLoss * 1000) / 1000;
-
-            return x.replace("(Short, x20)", "\nSHORT");
-          }
-          if (x.includes("Long")) {
-            entryValue = entryValue + entryValue * 0.001;
-            stopLoss = entryValue - entryValue * 0.05;
-
-            stopLoss = Math.round(stopLoss * 1000) / 1000;
-
-            return x.replace("(Long, x20)", "\nLONG");
-          }
-          return x.trim();
-        });
-
-        newMessage = newMessage.map((x) => {
-          const index = x?.indexOf("(");
-          return index !== -1 ? x.slice(0, index).trim() : x.trim();
-        });
-
-        newMessage.push(`Stop Loss : ${stopLoss}`);
-        newMessage = newMessage.join("\n");
-        console.log(`Message ID: ${message.id}`);
-        console.log(newMessage);
-
-        await client.sendMessage(channelBot, { message: newMessage });
+        await client.sendMessage(channelBot, { message: res_mess });
 
         receivedMessageIds.add(message.id);
       }, 5000 * index);
@@ -121,7 +115,7 @@ const runCode = async () => {
   };
 
   fetchNewMessages();
-  setInterval(fetchNewMessages, 60000);
+  setInterval(fetchNewMessages, 1000 * 10);
 };
 
 runCode();
