@@ -67,11 +67,14 @@ const runCode = async () => {
     newMessages.forEach((message, index) => {
       setTimeout(async () => {
         let res_mess = "";
-        const pairMatch = message.match(/#(\w+)\/(\w+)/);
-        const positionLeverageMatch = message.match(/\((Long|Short), x(\d+)\)/);
-        const entryMatch = message.match(/Entry - ([\d.]+)/);
 
-        const takeProfitMatches = message.match(
+        const pairMatch = message.message.match(/#(\w+)\/(\w+)/);
+        const positionLeverageMatch = message.message.match(
+          /\((Long|Short), x(\d+)\)/
+        );
+        const entryMatch = message.message.match(/Entry - ([\d.]+)/);
+
+        const takeProfitMatches = message.message.match(
           /Take-Profit:\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+).*\n\s*([\d.]+)/
         );
 
@@ -89,33 +92,35 @@ const runCode = async () => {
           let stopLoss = null;
 
           if (position === "LONG") {
-            let entryValue = entry + entry * 0.005;
-            stopLoss = Math.round(entryValue - entryValue * 0.05 * 1000) / 1000;
+            let entryValue = entry + entry * 0.003;
+            stopLoss = entryValue - entryValue * 0.05;
+
+            stopLoss = Math.round(stopLoss * 1000) / 1000;
           } else {
-            let entryValue = entry - entry * 0.005;
-            stopLoss = Math.round(entryValue - entryValue * 0.05 * 1000) / 1000;
+            let entryValue = entry - entry * 0.003;
+            stopLoss = entryValue + entryValue * 0.05;
+
+            stopLoss = Math.round(stopLoss * 1000) / 1000;
           }
 
-          res_mess = `${pair}\n${position}\n20\nX10\nTP:\n${takeProfits}\nSL:${stopLoss}`;
+          res_mess = `${pair}\n${position}\n20\nX10\nTP:\n${takeProfits}\nSL:\n${stopLoss}`;
           console.log(res_mess);
+          console.log(message.id);
+          await client.sendMessage(channelBot, { message: res_mess });
+          receivedMessageIds.add(message.id);
+          fs.writeFileSync(
+            "received_message_ids.txt",
+            Array.from(receivedMessageIds).join("\n")
+          );
         } else {
           console.error("Input format is not recognized.");
         }
-
-        await client.sendMessage(channelBot, { message: res_mess });
-
-        receivedMessageIds.add(message.id);
-      }, 5000 * index);
+      }, 1000 * index);
     });
-
-    fs.writeFileSync(
-      "received_message_ids.txt",
-      Array.from(receivedMessageIds).join("\n")
-    );
   };
 
   fetchNewMessages();
-  setInterval(fetchNewMessages, 1000 * 10);
+  setInterval(fetchNewMessages, 1000 * 3);
 };
 
 runCode();
